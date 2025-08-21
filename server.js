@@ -114,6 +114,12 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
 
     console.log(`🔄 Updated Room ${room.roomId} Players List:`, room.players);
 
+   // 🔔 NEW: Notify all devices about this room
+    await notifyAllDevices({
+      title: "🎮 New Game Room Available",
+      body: `${playerName} just opened a ₦${amount} room. Join before it fills up!`,
+      data: { roomId: room.roomId, amount },
+    });
     // If 2 players are present, start the game
     if (room.players.length === 2) {
        startGame(room)

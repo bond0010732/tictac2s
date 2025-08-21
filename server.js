@@ -10,6 +10,10 @@ const WinnerModel = require("./models/WinnerModel");
 const LoserModel = require("./models/LoserModel");
   // import fetch from "node-fetch";
 const DeviceModel = require("./models/DeviceModel.js"); // adjust path
+const { Expo } = require('expo-server-sdk');
+
+const expo = new Expo();
+
 
 require("dotenv").config();
 
@@ -199,8 +203,8 @@ async function startGame(room) {
 }
 
 
-export const notifyAllDevices = async ({ title, message, data }) => {
-  // 1. Fetch ALL devices
+
+const notifyAllDevices = async ({ title, message, data }) => {
   const devices = await DeviceModel.find({});
   if (!devices || devices.length === 0) {
     console.warn('⚠️ No devices found to notify.');
@@ -209,7 +213,6 @@ export const notifyAllDevices = async ({ title, message, data }) => {
 
   const messages = [];
 
-  // 2. Prepare push messages
   for (const device of devices) {
     if (Expo.isExpoPushToken(device.expoPushToken)) {
       messages.push({
@@ -224,7 +227,6 @@ export const notifyAllDevices = async ({ title, message, data }) => {
     }
   }
 
-  // 3. Chunk & send
   const chunks = expo.chunkPushNotifications(messages);
   const tickets = [];
 

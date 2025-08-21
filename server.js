@@ -8,6 +8,8 @@ const OdinCircledbModel = require("./models/odincircledb");
 const BetModel = require("./models/BetModel");
 const WinnerModel = require("./models/WinnerModel");
 const LoserModel = require("./models/LoserModel");
+  // import fetch from "node-fetch";
+const DeviceModel = require("./models/DeviceModel.js"); // adjust path
 
 require("dotenv").config();
 
@@ -188,6 +190,63 @@ async function startGame(room) {
         console.error("❌ Error starting game:", error);
         io.to(room.roomId).emit("invalidGameStart", "Server error while starting the game");
     }
+}
+
+
+async function notifyAllDevices({ title, body, data }) {
+  try {
+    const devices = await DeviceModel.find({}, "expoPushToken");
+    console.log(`📱 Found ${devices.length} device(s) to notify.`);
+
+    if (devices.length === 0) {
+      return { message: "No devices to notify." };
+    }
+
+    const messages = devices
+      .filter((d) => d.expoPushToken?.startsWith("ExponentPushToken"))
+      .map((d) => ({
+        to: d.expoPushToken,
+        sound: "default",
+        title,
+        body,
+        data,
+      }));
+
+    const chunkSize = 100;
+    const chunks = [];
+    for (let i = 0; i < messages.length; i += chunkSize) {
+      chunks.push(messages.slice(i, i + chunkSize));
+    }
+
+    for (const chunk of chunks) {
+      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(chunk),
+      });
+
+      const result = await response.json();
+
+      if (Array.isArray(result.data)) {
+        for (let i = 0; i < result.data.length; i++) {
+          const resItem = result.data[i];
+          if (
+            resItem.status === "error" &&
+            resItem.details?.error === "DeviceNotRegistered"
+          ) {
+            const badToken = chunk[i].to;
+            await DeviceModel.deleteOne({ expoPushToken: badToken });
+            console.log(`🧹 Removed bad token: ${badToken}`);
+          }
+        }
+      }
+    }
+
+    return { message: "Notifications sent." };
+  } catch (err) {
+    console.error("❌ Error sending notifications:", err);
+    throw err;
+  }
 }
 
 

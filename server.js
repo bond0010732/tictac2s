@@ -199,61 +199,47 @@ async function startGame(room) {
 }
 
 
-async function notifyAllDevices({ title, body, data }) {
-  try {
-    const devices = await DeviceModel.find({}, "expoPushToken");
-    console.log(`📱 Found ${devices.length} device(s) to notify.`);
-
-    if (devices.length === 0) {
-      return { message: "No devices to notify." };
-    }
-
-    const messages = devices
-      .filter((d) => d.expoPushToken?.startsWith("ExponentPushToken"))
-      .map((d) => ({
-        to: d.expoPushToken,
-        sound: "default",
-        title,
-        body,
-        data,
-      }));
-
-    const chunkSize = 100;
-    const chunks = [];
-    for (let i = 0; i < messages.length; i += chunkSize) {
-      chunks.push(messages.slice(i, i + chunkSize));
-    }
-
-    for (const chunk of chunks) {
-      const response = await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(chunk),
-      });
-
-      const result = await response.json();
-
-      if (Array.isArray(result.data)) {
-        for (let i = 0; i < result.data.length; i++) {
-          const resItem = result.data[i];
-          if (
-            resItem.status === "error" &&
-            resItem.details?.error === "DeviceNotRegistered"
-          ) {
-            const badToken = chunk[i].to;
-            await DeviceModel.deleteOne({ expoPushToken: badToken });
-            console.log(`🧹 Removed bad token: ${badToken}`);
-          }
-        }
-      }
-    }
-
-    return { message: "Notifications sent." };
-  } catch (err) {
-    console.error("❌ Error sending notifications:", err);
-    throw err;
+export const notifyAllDevices = async ({ title, message, data }) => {
+  // 1. Fetch ALL devices
+  const devices = await DeviceModel.find({});
+  if (!devices || devices.length === 0) {
+    console.warn('⚠️ No devices found to notify.');
+    return [];
   }
-}
+
+  const messages = [];
+
+  // 2. Prepare push messages
+  for (const device of devices) {
+    if (Expo.isExpoPushToken(device.expoPushToken)) {
+      messages.push({
+        to: device.expoPushToken,
+        sound: 'default',
+        title: title || 'New Join Event 🎮',
+        body: message || 'A player has joined. Tap to join the game!',
+        data: data || {},
+      });
+    } else {
+      console.warn('⚠️ Invalid Expo push token skipped:', device.expoPushToken);
+    }
+  }
+
+  // 3. Chunk & send
+  const chunks = expo.chunkPushNotifications(messages);
+  const tickets = [];
+
+  for (const chunk of chunks) {
+    try {
+      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      tickets.push(...ticketChunk);
+    } catch (err) {
+      console.error('❌ Error sending notification chunk:', err);
+    }
+  }
+
+  console.log(`📱 Notified ${messages.length} device(s).`);
+  return tickets;
+};
 
 
   

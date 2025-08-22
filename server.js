@@ -241,8 +241,8 @@ const notifyAllDevices = async ({ title, message, data }) => {
       body: message || 'A player has joined. Tap to join the game!',
       data: {
        screen: "StrangersGameScreen",       // 👈 tell app to open TriviaScreen
-       roomId: "5pg3ko2il",
-       amount: 500
+       roomId,
+       amount,
        }
     };
 

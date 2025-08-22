@@ -171,11 +171,44 @@ async function startGame(room) {
         }
 
         // Check if both players have enough balance
-        if (player1.wallet.balance < room.amount || player2.wallet.balance < room.amount) {
-            console.log("❌ Error: One or both players have insufficient balance.");
-            io.to(room.roomId).emit("invalidGameStart", "One or both players have insufficient balance");
-            return;
-        }
+        // if (player1.wallet.balance < room.amount || player2.wallet.balance < room.amount) {
+        //     console.log("❌ Error: One or both players have insufficient balance.");
+        //     io.to(room.roomId).emit("invalidGameStart", "One or both players have insufficient balance");
+        //     return;
+        // }
+
+      if (player1.wallet.balance < room.amount || player2.wallet.balance < room.amount) {
+    console.log("❌ Error: One or both players have insufficient balance.");
+
+    // Find which player has insufficient balance
+    const insufficientPlayer = 
+        player1.wallet.balance < room.amount ? player1 : player2;
+
+    // Notify that player directly
+    io.to(insufficientPlayer.socketId).emit("insufficientFunds", {
+        message: `You need at least ${room.amount} coins to join this game.`,
+        required: room.amount,
+        current: insufficientPlayer.wallet.balance,
+    });
+
+    // Notify the other player that the opponent had insufficient funds
+    const otherPlayer = 
+        insufficientPlayer._id.equals(player1._id) ? player2 : player1;
+
+    io.to(otherPlayer.socketId).emit("opponentInsufficientFunds", {
+        message: "Opponent has insufficient funds. Waiting for another player...",
+    });
+
+    // Remove the insufficient player from the room
+    room.players = room.players.filter(
+        p => !p.userId.equals(insufficientPlayer._id)
+    );
+
+    await room.save();
+
+    return;
+}
+
 
         // Deduct the balance from both players
         player1.wallet.balance -= room.amount;

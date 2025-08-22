@@ -232,19 +232,23 @@ const notifyAllDevices = async ({ title, message, data }) => {
 
   const messages = [];
 
-  for (const device of devices) {
-    if (Expo.isExpoPushToken(device.expoPushToken)) {
-      messages.push({
-        to: device.expoPushToken,
-        sound: 'default',
-        title: title || 'New Join Event 🎮',
-        body: message || 'A player has joined. Tap to join the game!',
-        data: data || {},
-      });
-    } else {
-      console.warn('⚠️ Invalid Expo push token skipped:', device.expoPushToken);
-    }
+ for (const device of devices) {
+  if (Expo.isExpoPushToken(device.expoPushToken)) {
+    const payload = {
+      to: device.expoPushToken,
+      sound: 'default',
+      title: title || 'New Join Event 🎮',
+      body: message || 'A player has joined. Tap to join the game!',
+      data: data || {},
+    };
+
+    console.log("📦 Notification payload:", payload); // 👈 log the payload
+
+    messages.push(payload);
+  } else {
+    console.warn('⚠️ Invalid Expo push token skipped:', device.expoPushToken);
   }
+}
 
   const chunks = expo.chunkPushNotifications(messages);
   const tickets = [];

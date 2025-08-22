@@ -239,7 +239,11 @@ const notifyAllDevices = async ({ title, message, data }) => {
       sound: 'default',
       title: title || 'New Join Event 🎮',
       body: message || 'A player has joined. Tap to join the game!',
-      data: data || {},
+      data: {
+       screen: "StrangersGameScreen",       // 👈 tell app to open TriviaScreen
+       roomId: "5pg3ko2il",
+       amount: 500
+       }
     };
 
     console.log("📦 Notification payload:", payload); // 👈 log the payload

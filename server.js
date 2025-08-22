@@ -185,6 +185,25 @@ async function startGame(room) {
         await player1.save();
         await player2.save();
 
+         // After player1.save() and player2.save()
+
+await BetModel.create({
+  userId: player1._id,
+  roomId: room.roomId,
+  amount: room.amount,
+  type: "placed",
+});
+
+await BetModel.create({
+  userId: player2._id,
+  roomId: room.roomId,
+  amount: room.amount,
+  type: "placed",
+});
+
+console.log("📝 Bet history recorded for both players");
+
+
         // Update total bet in the room
         room.totalBet = room.amount * 2;
 

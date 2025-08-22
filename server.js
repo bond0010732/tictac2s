@@ -122,7 +122,7 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
     await notifyAllDevices({
       title: "🎮 New Game Room Available",
       body: `${playerName} just opened a ₦${amount} room. Join before it fills up!`,
-      data: { roomId: room.roomId, amount },
+      data: { roomId: room.roomId, amount, screen: "StrangersGameScreen" },
     });
     // If 2 players are present, start the game
     if (room.players.length === 2) {
@@ -239,11 +239,7 @@ const notifyAllDevices = async ({ title, message, data }) => {
       sound: 'default',
       title: title || 'New Join Event 🎮',
       body: message || 'A player has joined. Tap to join the game!',
-      data: {
-       screen: "StrangersGameScreen",       // 👈 tell app to open TriviaScreen
-       roomId,
-       amount,
-       }
+      data: data || {},
     };
 
     console.log("📦 Notification payload:", payload); // 👈 log the payload

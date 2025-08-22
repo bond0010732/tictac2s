@@ -191,14 +191,14 @@ await BetModel.create({
   userId: player1._id,
   roomId: room.roomId,
   amount: room.amount,
-  type: "placed",
+  type: "bet",
 });
 
 await BetModel.create({
   userId: player2._id,
   roomId: room.roomId,
   amount: room.amount,
-  type: "placed",
+  type: "bet",
 });
 
 console.log("📝 Bet history recorded for both players");

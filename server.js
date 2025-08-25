@@ -124,6 +124,13 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
       body: `${playerName} just opened a ₦${amount} room. Join before it fills up!`,
       data: { roomId: room.roomId, amount, screen: "StrangersGameScreen" },
     });
+
+// Personalized waiting message for the first player
+if (room.players.length === 1) {
+    console.log(`🕒 First player waiting: ${playerName} is waiting for an opponent...`);
+    socket.emit("waiting", { message: `${playerName} is waiting for an opponent...` });
+}
+
     // If 2 players are present, start the game
     if (room.players.length === 2) {
        startGame(room)

@@ -67,10 +67,12 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
     } else {
         // No room? Create one
         const newRoomId = generateRoomId();
+         const roomTitle = roomList.find(r => r.amount === amount)?.title || `Room ${newRoomId}`;
         console.log(`🆕 Creating a new Room with ID: ${newRoomId}`);
 
         room = {
             roomId: newRoomId,
+            title: roomTitle,
             players: [],
             board: Array(9).fill(null),
             currentPlayer: 0,
@@ -80,13 +82,6 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
 
         activeRooms[newRoomId] = room;
     }
-
-    // If room is full, reject the request
-    if (room.players.length >= 2) {
-        console.log(`🚫 Room ${room.roomId} is full.`);
-        return socket.emit("roomFull", "Room is already full.");
-    }
-
     // Assign player symbol
     const symbols = ["X", "O"];
     const playerNumber = room.players.length + 1;
@@ -109,6 +104,11 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
     socket.join(room.roomId);
     console.log(`✅ ${playerName} joined Room ${room.roomId} as Player ${playerNumber}`);
 
+  // Personalized waiting message for the first player
+if (room.players.length === 1) {
+    console.log(`🕒 First player waiting: ${playerName} is waiting for an opponent in room "${room.title}" with ₦${room.amount}`);
+    socket.emit("waiting", { message: `${playerName} is waiting for an opponent...`, roomTitle: room.title, amount: room.amount });
+}
     // **NEW** - Emit event to inform the player they successfully joined
     socket.emit("roomJoined", { roomId: room.roomId, amount, players: room.players });
 
@@ -119,11 +119,13 @@ socket.on("joinRoom", async ({ playerName, userId, amount, expoPushToken }) => {
     console.log(`🔄 Updated Room ${room.roomId} Players List:`, room.players);
 
    // 🔔 NEW: Notify all devices about this room
-    await notifyAllDevices({
-      title: "🎮 New Game Room Available",
-      body: `${playerName} just opened a ₦${amount} room. Join before it fills up!`,
-      data: { roomId: room.roomId, amount, screen: "StrangersGameScreen" },
-    });
+await notifyAllDevices({
+    title: `⚡ ${room.title} is open!`,
+    body: `A new ₦${room.amount} challenge by ${playerName} is here. Dare to win and rise to the top!`,
+    data: { roomId: room.roomId, amount: room.amount, title: room.title, screen: "StrangersGameScreen" },
+});
+
+
 
 // Personalized waiting message for the first player
 if (room.players.length === 1) {

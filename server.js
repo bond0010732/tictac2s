@@ -23,6 +23,20 @@ app.use(cors());
 const server = http.createServer(app);
 // const { v4: uuidv4 } = require('uuid'); // Import UUID for unique room IDs
 
+// server.js or wherever you handle sockets
+const roomList = [
+  { roomId: 'QAZ123', title: 'Dey Play', amount: 500 },
+  { roomId: 'WSX456', title: 'Brotherly', amount: 1000 },
+  { roomId: 'EDC789', title: 'Steeze', amount: 1500 },
+  { roomId: 'RFV321', title: 'Urgent 2K', amount: 2000 },
+  { roomId: 'TGB654', title: 'No Loose Guard', amount: 2500 },
+  { roomId: 'YHN987', title: 'E Choke', amount: 3000 },
+  { roomId: 'UJM741', title: 'Everywhere Stew', amount: 3500 },
+  { roomId: 'IKL852', title: 'My Oga', amount: 4000 },
+  { roomId: 'OLP963', title: 'Cut Soap For me', amount: 4500 },
+  { roomId: 'ZXC159', title: 'Boss Man', amount: 5000 },
+];
+
 
 // MongoDB Connection
 const uri = `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_CLUSTER}.kbgr5.mongodb.net/${process.env.MONGO_DATABASE}?retryWrites=true&w=majority`;

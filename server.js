@@ -294,9 +294,8 @@ const notifyAllDevices = async ({ title, message, data }) => {
       to: device.expoPushToken,
       sound: 'default',
       title: title || 'New Join Event 🎮',
-      body: message || `A player has joined room with ₦${room.amount}. Tap to join the game!`,
-      // data: data || {},
-       data: { roomId: room.roomId, amount: room.amount, title: room.title, screen: "StrangersGameScreen" },
+      body: message || `A player has joined room with ₦${data.amount}. Tap to join the game!`,
+      data: data || {},
     };
 
     console.log("📦 Notification payload:", payload); // 👈 log the payload

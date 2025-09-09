@@ -14,6 +14,15 @@ const { Expo } = require('expo-server-sdk');
 
 const expo = new Expo();
 
+const apn = require("apn");
+
+// APNs provider setup (p12-based)
+const apnProvider = new apn.Provider({
+  cert: "publicnew_cert.pem",         // Apple-issued certificate
+  key: "privatenew_keys.pem",
+  production: true,              // set true for TestFlight / App Store builds
+});
+
 
 require("dotenv").config();
 
@@ -279,49 +288,116 @@ console.log("📝 Bet history recorded for both players");
 
 
 
-const notifyAllDevices = async ({ title, message, data }) => {
+// const notifyAllDevices = async ({ title, message, data }) => {
+//   const devices = await DeviceModel.find({});
+//   if (!devices || devices.length === 0) {
+//     console.warn('⚠️ No devices found to notify.');
+//     return [];
+//   }
+
+//   const messages = [];
+
+//  for (const device of devices) {
+//   if (Expo.isExpoPushToken(device.expoPushToken)) {
+//     const payload = {
+//       to: device.expoPushToken,
+//       sound: 'default',
+//       title: title || 'New Join Event 🎮',
+//       body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
+//       data: data || {},
+//     };
+
+//     console.log("📦 Notification payload:", payload); // 👈 log the payload
+
+//     messages.push(payload);
+//   } else {
+//     console.warn('⚠️ Invalid Expo push token skipped:', device.expoPushToken);
+//   }
+// }
+
+//   const chunks = expo.chunkPushNotifications(messages);
+//   const tickets = [];
+
+//   for (const chunk of chunks) {
+//     try {
+//       const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+//       tickets.push(...ticketChunk);
+//     } catch (err) {
+//       console.error('❌ Error sending notification chunk:', err);
+//     }
+//   }
+
+//   console.log(`📱 Notified ${messages.length} device(s).`);
+//   return tickets;
+// };
+
+
+ const notifyAllDevices = async ({ title, message, data }) => {
   const devices = await DeviceModel.find({});
   if (!devices || devices.length === 0) {
     console.warn('⚠️ No devices found to notify.');
     return [];
   }
 
-  const messages = [];
+  const expoMessages = [];
+  const apnPromises = [];
 
- for (const device of devices) {
-  if (Expo.isExpoPushToken(device.expoPushToken)) {
-    const payload = {
-      to: device.expoPushToken,
-      sound: 'default',
-      title: title || 'New Join Event 🎮',
-      body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
-      data: data || {},
-    };
+  for (const device of devices) {
+    // --- Expo Push (Android + iOS w/ Expo) ---
+    if (device.expoPushToken && Expo.isExpoPushToken(device.expoPushToken)) {
+      const payload = {
+        to: device.expoPushToken,
+        sound: 'default',
+        title: title || 'New Join Event 🎮',
+        body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
+        data: data || {},
+      };
 
-    console.log("📦 Notification payload:", payload); // 👈 log the payload
+      console.log("📦 Expo Notification payload:", payload);
+      expoMessages.push(payload);
+    }
 
-    messages.push(payload);
-  } else {
-    console.warn('⚠️ Invalid Expo push token skipped:', device.expoPushToken);
-  }
-}
+    // --- Direct APNs Push (iOS) ---
+    if (device.apnsToken) {
+      const note = new apn.Notification({
+        alert: {
+          title: title || "New Join Event 🎮",
+           body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
+        },
+        sound: "default",
+        payload: data || {},
+        topic: "com.bond0011.betxcircleapp", // 👈 replace with your iOS bundle ID
+      });
 
-  const chunks = expo.chunkPushNotifications(messages);
-  const tickets = [];
-
-  for (const chunk of chunks) {
-    try {
-      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-      tickets.push(...ticketChunk);
-    } catch (err) {
-      console.error('❌ Error sending notification chunk:', err);
+      console.log("🍏 APNs Notification payload:", note);
+      apnPromises.push(apnProvider.send(note, device.apnsToken));
     }
   }
 
-  console.log(`📱 Notified ${messages.length} device(s).`);
-  return tickets;
-};
+  // --- Send Expo Push ---
+  const expoChunks = expo.chunkPushNotifications(expoMessages);
+  const expoTickets = [];
 
+  for (const chunk of expoChunks) {
+    try {
+      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      expoTickets.push(...ticketChunk);
+    } catch (err) {
+      console.error('❌ Expo error:', err);
+    }
+  }
+
+  // --- Send APNs Push ---
+  let apnResults = [];
+  try {
+    apnResults = await Promise.all(apnPromises);
+  } catch (err) {
+    console.error('❌ APNs error:', err);
+  }
+
+  console.log(`📱 Sent ${expoMessages.length} Expo notification(s) and ${apnPromises.length} APNs notification(s).`);
+  return { expoTickets, apnResults };
+};
 
   
 const startTurnTimer = (roomId) => {

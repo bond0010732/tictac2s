@@ -332,18 +332,35 @@ console.log("📝 Bet history recorded for both players");
 // };
 
 
- const notifyAllDevices = async ({ title, message, data }) => {
+const notifyAllDevices = async ({ title, message, data }) => {
   const devices = await DeviceModel.find({});
   if (!devices || devices.length === 0) {
     console.warn('⚠️ No devices found to notify.');
-    return [];
+    return { expoTickets: [], apnResults: [] };
   }
 
   const expoMessages = [];
   const apnPromises = [];
 
   for (const device of devices) {
-    // --- Expo Push (Android + iOS w/ Expo) ---
+    // --- Prefer APNs if available ---
+    if (device.apnsToken) {
+      const note = new apn.Notification({
+        alert: {
+          title: title || "New Join Event 🎮",
+          body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
+        },
+        sound: "default",
+        payload: data || {},
+        topic: "com.bond0011.betxcircleapp", // 👈 your iOS bundle ID
+      });
+
+      console.log(`🍏 APNs payload for device ${device._id}:`, note);
+      apnPromises.push(apnProvider.send(note, device.apnsToken));
+      continue; // 👈 skip Expo if APNs exists
+    }
+
+    // --- Fallback to Expo (Android + iOS w/ Expo Go) ---
     if (device.expoPushToken && Expo.isExpoPushToken(device.expoPushToken)) {
       const payload = {
         to: device.expoPushToken,
@@ -353,37 +370,22 @@ console.log("📝 Bet history recorded for both players");
         data: data || {},
       };
 
-      console.log("📦 Expo Notification payload:", payload);
+      console.log(`📦 Expo payload for device ${device._id}:`, payload);
       expoMessages.push(payload);
-    }
-
-    // --- Direct APNs Push (iOS) ---
-    if (device.apnsToken) {
-      const note = new apn.Notification({
-        alert: {
-          title: title || "New Join Event 🎮",
-           body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
-        },
-        sound: "default",
-        payload: data || {},
-        topic: "com.bond0011.betxcircleapp", // 👈 replace with your iOS bundle ID
-      });
-
-      console.log("🍏 APNs Notification payload:", note);
-      apnPromises.push(apnProvider.send(note, device.apnsToken));
+    } else {
+      console.warn(`⚠️ Skipped device ${device._id}: no valid token`);
     }
   }
 
   // --- Send Expo Push ---
-  const expoChunks = expo.chunkPushNotifications(expoMessages);
   const expoTickets = [];
-
+  const expoChunks = expo.chunkPushNotifications(expoMessages);
   for (const chunk of expoChunks) {
     try {
       const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
       expoTickets.push(...ticketChunk);
     } catch (err) {
-      console.error('❌ Expo error:', err);
+      console.error('❌ Expo send error:', err);
     }
   }
 
@@ -392,12 +394,13 @@ console.log("📝 Bet history recorded for both players");
   try {
     apnResults = await Promise.all(apnPromises);
   } catch (err) {
-    console.error('❌ APNs error:', err);
+    console.error('❌ APNs send error:', err);
   }
 
-  console.log(`📱 Sent ${expoMessages.length} Expo notification(s) and ${apnPromises.length} APNs notification(s).`);
+  console.log(`📱 Sent ${expoMessages.length} Expo push(es) and ${apnPromises.length} APNs push(es).`);
   return { expoTickets, apnResults };
 };
+
 
   
 const startTurnTimer = (roomId) => {

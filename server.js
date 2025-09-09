@@ -352,9 +352,6 @@ const notifyAllDevices = async ({ title, body, data }) => {
       }
     }
 
-    // 👇 Hardcode APNs token for testing
-    apnsTokens.push("62856ea84e5606dbc06c4f878651108b7d6bfcdb843ef8a1a064485f2ee13a4a");
-
     // --- Game context defaults ---
     const finalTitle = title || "New Join Event 🎮";
     const finalBody =
@@ -363,7 +360,7 @@ const notifyAllDevices = async ({ title, body, data }) => {
 
     const payload = {
       ...data,
-      type: "GAME_EVENT",
+      type: "GAME_EVENT", // 👈 custom type for your frontend
       timestamp: Date.now(),
     };
 

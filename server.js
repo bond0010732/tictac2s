@@ -334,7 +334,7 @@ console.log("📝 Bet history recorded for both players");
 
 const notifyAllDevices = async ({ title, body, data }) => {
   try {
-    const devices = await Device.find({});
+    const devices = await DeviceModel.find({});
     if (!devices || devices.length === 0) {
       console.warn('⚠️ No devices found to notify.');
       return [];

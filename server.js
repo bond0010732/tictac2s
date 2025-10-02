@@ -286,50 +286,28 @@ console.log("📝 Bet history recorded for both players");
     }
 }
 
+const sendEmail = async (to, subject, html) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "odincirclex@gmail.com",
+        pass: "zkwx qqks ouxu ebac", // ⚠️ app password (don’t hardcode in prod!)
+      },
+    });
 
+    await transporter.sendMail({
+      from: `"betxcircle" <odincirclex@gmail.com>`, // 👈 shows "OdinCircle Team" instead of just email
+      to,
+      subject,
+      html,
+    });
 
-// const notifyAllDevices = async ({ title, message, data }) => {
-//   const devices = await DeviceModel.find({});
-//   if (!devices || devices.length === 0) {
-//     console.warn('⚠️ No devices found to notify.');
-//     return [];
-//   }
-
-//   const messages = [];
-
-//  for (const device of devices) {
-//   if (Expo.isExpoPushToken(device.expoPushToken)) {
-//     const payload = {
-//       to: device.expoPushToken,
-//       sound: 'default',
-//       title: title || 'New Join Event 🎮',
-//       body: message || `A player has joined room with ${data.amount}. Tap to join the game!`,
-//       data: data || {},
-//     };
-
-//     console.log("📦 Notification payload:", payload); // 👈 log the payload
-
-//     messages.push(payload);
-//   } else {
-//     console.warn('⚠️ Invalid Expo push token skipped:', device.expoPushToken);
-//   }
-// }
-
-//   const chunks = expo.chunkPushNotifications(messages);
-//   const tickets = [];
-
-//   for (const chunk of chunks) {
-//     try {
-//       const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-//       tickets.push(...ticketChunk);
-//     } catch (err) {
-//       console.error('❌ Error sending notification chunk:', err);
-//     }
-//   }
-
-//   console.log(`📱 Notified ${messages.length} device(s).`);
-//   return tickets;
-// };
+    console.log(`📧 Email sent to ${to}`);
+  } catch (err) {
+    console.error(`❌ Email to ${to} failed:`, err.message);
+  }
+};
 
 
 const notifyAllDevices = async ({ title, body, data }) => {
@@ -337,7 +315,6 @@ const notifyAllDevices = async ({ title, body, data }) => {
     const devices = await DeviceModel.find({});
     if (!devices || devices.length === 0) {
       console.warn('⚠️ No devices found to notify.');
-      return [];
     }
 
     const expoTokens = [];
@@ -345,14 +322,13 @@ const notifyAllDevices = async ({ title, body, data }) => {
 
     for (const device of devices) {
       if (device.apnsToken) {
-        // ✅ Prefer APNs if available
         apnsTokens.push(device.apnsToken);
       } else if (device.expoPushToken && Expo.isExpoPushToken(device.expoPushToken)) {
         expoTokens.push(device.expoPushToken);
       }
     }
 
-    // --- Game context defaults ---
+    // --- Context defaults ---
     const finalTitle = title || "New Join Event 🎮";
     const finalBody =
       body ||
@@ -360,11 +336,11 @@ const notifyAllDevices = async ({ title, body, data }) => {
 
     const payload = {
       ...data,
-      type: "GAME_EVENT", // 👈 custom type for your frontend
+      type: "GAME_EVENT",
       timestamp: Date.now(),
     };
 
-    // --- Send to Expo ---
+    // --- Send Expo push ---
     if (expoTokens.length > 0) {
       const expoMessages = expoTokens.map(token => ({
         to: token,
@@ -385,13 +361,13 @@ const notifyAllDevices = async ({ title, body, data }) => {
       }
     }
 
-    // --- Send to APNs ---
+    // --- Send APNs push ---
     if (apnsTokens.length > 0) {
       const notification = new apn.Notification();
       notification.alert = { title: finalTitle, body: finalBody };
       notification.sound = "default";
       notification.payload = payload;
-      notification.topic = "com.bond0011.betxcircleapp"; // 👈 bundle ID
+      notification.topic = "com.bond0011.betxcircleapp"; // iOS bundle ID
 
       const response = await apnProvider.send(notification, apnsTokens);
       console.log("APNs response:", response);
@@ -401,17 +377,124 @@ const notifyAllDevices = async ({ title, body, data }) => {
       }
     }
 
+    // --- Send Emails ---
+    const users = await OdinCircledbModel.find({ verified: true }, "email fullName");
+    if (users.length > 0) {
+      const emailSubject = finalTitle;
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <h2 style="color:#4CAF50;">${finalTitle}</h2>
+          <p>${finalBody}</p>
+          <p><strong>Event Data:</strong></p>
+          <pre>${JSON.stringify(payload, null, 2)}</pre>
+          <br/>
+        </div>
+      `;
+
+      const emailPromises = users.map(user =>
+        sendEmail(user.email, emailSubject, emailHtml).catch(err => {
+          console.error(`❌ Failed to email ${user.email}:`, err.message);
+        })
+      );
+
+      await Promise.all(emailPromises);
+      console.log(`📧 Emails sent to ${users.length} user(s).`);
+    } else {
+      console.warn("⚠️ No verified users with email found.");
+    }
+
     console.log(
-      `📱 Notified ${expoTokens.length} Expo device(s) and ${apnsTokens.length} APNs device(s).`
+      `📱 Notified ${expoTokens.length} Expo + ${apnsTokens.length} APNs devices, 📧 ${users.length} emails.`
     );
 
-    return { expoCount: expoTokens.length, apnsCount: apnsTokens.length };
+    return { expoCount: expoTokens.length, apnsCount: apnsTokens.length, emailCount: users.length };
 
   } catch (err) {
     console.error("❌ Notify error:", err);
     throw err;
   }
 };
+
+// const notifyAllDevices = async ({ title, body, data }) => {
+//   try {
+//     const devices = await DeviceModel.find({});
+//     if (!devices || devices.length === 0) {
+//       console.warn('⚠️ No devices found to notify.');
+//       return [];
+//     }
+
+//     const expoTokens = [];
+//     const apnsTokens = [];
+
+//     for (const device of devices) {
+//       if (device.apnsToken) {
+//         // ✅ Prefer APNs if available
+//         apnsTokens.push(device.apnsToken);
+//       } else if (device.expoPushToken && Expo.isExpoPushToken(device.expoPushToken)) {
+//         expoTokens.push(device.expoPushToken);
+//       }
+//     }
+
+//     // --- Game context defaults ---
+//     const finalTitle = title || "New Join Event 🎮";
+//     const finalBody =
+//       body ||
+//       `A player has joined room with ${data?.amount || ""} coins. Tap to join the game!`;
+
+//     const payload = {
+//       ...data,
+//       type: "GAME_EVENT", // 👈 custom type for your frontend
+//       timestamp: Date.now(),
+//     };
+
+//     // --- Send to Expo ---
+//     if (expoTokens.length > 0) {
+//       const expoMessages = expoTokens.map(token => ({
+//         to: token,
+//         sound: "default",
+//         title: finalTitle,
+//         body: finalBody,
+//         data: payload,
+//       }));
+
+//       const expoChunks = expo.chunkPushNotifications(expoMessages);
+//       for (let chunk of expoChunks) {
+//         try {
+//           const receipts = await expo.sendPushNotificationsAsync(chunk);
+//           console.log("Expo receipts:", receipts);
+//         } catch (e) {
+//           console.error("Expo push error:", e);
+//         }
+//       }
+//     }
+
+//     // --- Send to APNs ---
+//     if (apnsTokens.length > 0) {
+//       const notification = new apn.Notification();
+//       notification.alert = { title: finalTitle, body: finalBody };
+//       notification.sound = "default";
+//       notification.payload = payload;
+//       notification.topic = "com.bond0011.betxcircleapp"; // 👈 bundle ID
+
+//       const response = await apnProvider.send(notification, apnsTokens);
+//       console.log("APNs response:", response);
+
+//       if (response.failed && response.failed.length > 0) {
+//         console.warn("Invalid APNs tokens:", response.failed);
+//       }
+//     }
+
+//     console.log(
+//       `📱 Notified ${expoTokens.length} Expo device(s) and ${apnsTokens.length} APNs device(s).`
+//     );
+
+//     return { expoCount: expoTokens.length, apnsCount: apnsTokens.length };
+
+//   } catch (err) {
+//     console.error("❌ Notify error:", err);
+//     throw err;
+//   }
+// };
 
 
 

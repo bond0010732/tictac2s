@@ -290,7 +290,9 @@ console.log("📝 Bet history recorded for both players");
 const sendEmail = async (to, subject, html) => {
   try {
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
       pool: true,
       maxConnections: 5,
       maxMessages: 100,

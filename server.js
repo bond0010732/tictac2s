@@ -290,11 +290,17 @@ console.log("📝 Bet history recorded for both players");
 const sendEmail = async (to, subject, html) => {
   try {
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587, // or 587 with secure: false
+      secure: true, // true for port 465
+      pool: true, // keeps connections alive
+      maxConnections: 5,
+      maxMessages: 100,
       auth: {
         user: "odincirclex@gmail.com",
         pass: "zkwx qqks ouxu ebac", // ⚠️ app password (don’t hardcode in prod!)
       },
+        connectionTimeout: 10000, // 10 seconds
     });
 
     await transporter.sendMail({

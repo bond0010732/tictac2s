@@ -292,7 +292,7 @@ const sendEmail = async (to, subject, html) => {
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
       port: 587, // or 587 with secure: false
-      secure: true, // true for port 465
+      secure: false, // true for port 465
       pool: true, // keeps connections alive
       maxConnections: 5,
       maxMessages: 100,

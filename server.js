@@ -3,6 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const mongoose = require("mongoose");
+const nodemailer = require("nodemailer");
 
 const OdinCircledbModel = require("./models/odincircledb");
 const BetModel = require("./models/BetModel");

@@ -290,21 +290,19 @@ console.log("📝 Bet history recorded for both players");
 const sendEmail = async (to, subject, html) => {
   try {
     const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587, // or 587 with secure: false
-      secure: false, // true for port 465
-      pool: true, // keeps connections alive
+      service: "gmail",
+      pool: true,
       maxConnections: 5,
       maxMessages: 100,
       auth: {
         user: "odincirclex@gmail.com",
-        pass: "zkwx qqks ouxu ebac", // ⚠️ app password (don’t hardcode in prod!)
+        pass: "zkwx qqks ouxu ebac", // Gmail app password
       },
-        connectionTimeout: 10000, // 10 seconds
+      connectionTimeout: 10000, // 10 seconds
     });
 
     await transporter.sendMail({
-      from: `"betxcircle" <odincirclex@gmail.com>`, // 👈 shows "OdinCircle Team" instead of just email
+      from: `"betxcircle" <odincirclex@gmail.com>`,
       to,
       subject,
       html,
@@ -312,6 +310,7 @@ const sendEmail = async (to, subject, html) => {
 
     console.log(`📧 Email sent to ${to}`);
   } catch (err) {
+    // This only runs if Nodemailer can't connect OR Gmail rejects it
     console.error(`❌ Email to ${to} failed:`, err.message);
   }
 };
@@ -320,9 +319,7 @@ const sendEmail = async (to, subject, html) => {
 const notifyAllDevices = async ({ title, body, data }) => {
   try {
     const devices = await DeviceModel.find({});
-    if (!devices || devices.length === 0) {
-      console.warn('⚠️ No devices found to notify.');
-    }
+    const users = await OdinCircledbModel.find({ verified: true }, "email fullName");
 
     const expoTokens = [];
     const apnsTokens = [];
@@ -347,8 +344,9 @@ const notifyAllDevices = async ({ title, body, data }) => {
       timestamp: Date.now(),
     };
 
-    // --- Send Expo push ---
-    if (expoTokens.length > 0) {
+    // --- Helpers ---
+    const sendExpoNotifications = async () => {
+      if (expoTokens.length === 0) return 0;
       const expoMessages = expoTokens.map(token => ({
         to: token,
         sound: "default",
@@ -366,10 +364,11 @@ const notifyAllDevices = async ({ title, body, data }) => {
           console.error("Expo push error:", e);
         }
       }
-    }
+      return expoTokens.length;
+    };
 
-    // --- Send APNs push ---
-    if (apnsTokens.length > 0) {
+    const sendApnNotifications = async () => {
+      if (apnsTokens.length === 0) return 0;
       const notification = new apn.Notification();
       notification.alert = { title: finalTitle, body: finalBody };
       notification.sound = "default";
@@ -379,14 +378,12 @@ const notifyAllDevices = async ({ title, body, data }) => {
       const response = await apnProvider.send(notification, apnsTokens);
       console.log("APNs response:", response);
 
-      if (response.failed && response.failed.length > 0) {
-        console.warn("Invalid APNs tokens:", response.failed);
-      }
-    }
+      return apnsTokens.length;
+    };
 
-    // --- Send Emails ---
-    const users = await OdinCircledbModel.find({ verified: true }, "email fullName");
-    if (users.length > 0) {
+    const sendEmails = async () => {
+      if (users.length === 0) return 0;
+
       const emailSubject = finalTitle;
       const emailHtml = `
         <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -405,16 +402,21 @@ const notifyAllDevices = async ({ title, body, data }) => {
       );
 
       await Promise.all(emailPromises);
-      console.log(`📧 Emails sent to ${users.length} user(s).`);
-    } else {
-      console.warn("⚠️ No verified users with email found.");
-    }
+      return users.length;
+    };
+
+    // --- Run all in parallel ---
+    const [expoCount, apnsCount, emailCount] = await Promise.all([
+      sendExpoNotifications(),
+      sendApnNotifications(),
+      sendEmails(),
+    ]);
 
     console.log(
-      `📱 Notified ${expoTokens.length} Expo + ${apnsTokens.length} APNs devices, 📧 ${users.length} emails.`
+      `✅ Notified ${expoCount} Expo + ${apnsCount} APNs devices, 📧 ${emailCount} emails.`
     );
 
-    return { expoCount: expoTokens.length, apnsCount: apnsTokens.length, emailCount: users.length };
+    return { expoCount, apnsCount, emailCount };
 
   } catch (err) {
     console.error("❌ Notify error:", err);

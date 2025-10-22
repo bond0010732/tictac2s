@@ -57,7 +57,10 @@ mongoose
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: { 
+     origin: ["http://localhost:8081", 'https://unforested-phytoclimatologic-cedrick.ngrok-free.dev',"https://www.betxcircle.app"],
+   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  },
 });
 
 const activeRooms = {};

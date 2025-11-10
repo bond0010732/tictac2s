@@ -148,7 +148,7 @@ if (room.players.length === 1) {
    // 🔔 NEW: Notify all devices about this room
 await notifyAllDevices({
     title: `⚡ ${room.title} is open!`,
-    body: `A new ${room.amount} challenge by ${playerName} is here. Dare to win and rise to the top!`,
+    body: `A new challenge by ${playerName} is here. Dare to win and rise to the top!`,
     data: { roomId: room.roomId, amount: room.amount, title: room.title, screen: "StrangersGameScreen" },
 });
 
